@@ -110,7 +110,7 @@ async def get_instance_by_any(model:Type,db:AsyncSession,data:dict):
         result=await db.execute(stmt)
         return result.scalar_one_or_none()
     except SQLAlchemyError as e:
-        raise Exception(f"Get data failed")
+        raise Exception(f"Get data failed {str(e)}" )
     
 async def bulk_get_instance(model:Type,db:AsyncSession,**kwargs):
     try:

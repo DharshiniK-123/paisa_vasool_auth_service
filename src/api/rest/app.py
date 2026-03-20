@@ -8,4 +8,4 @@ app.include_router(user_routes.router, prefix="/api/v1/users")
 
 @app.on_event("startup")
 async def on_startup():
-    await init_db()
+     await init_db()
