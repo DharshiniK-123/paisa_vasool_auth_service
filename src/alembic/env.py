@@ -4,6 +4,7 @@ from logging.config import fileConfig
 
 from dotenv import load_dotenv
 from sqlalchemy import pool
+from sqlalchemy.engine import Connection
 from sqlalchemy.ext.asyncio import create_async_engine
 
 from alembic import context
@@ -37,13 +38,11 @@ def run_migrations_offline() -> None:
         context.run_migrations()
 
 
-def do_run_migrations(connection):
-    context.configure(
-        connection=connection,
-        target_metadata=target_metadata
-    )
+def do_run_migrations(connection: Connection) -> None:
+    context.configure(connection=connection, target_metadata=None)
     with context.begin_transaction():
         context.run_migrations()
+
 
 
 async def run_migrations_online() -> None:
