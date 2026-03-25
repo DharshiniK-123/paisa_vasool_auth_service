@@ -1,5 +1,7 @@
-from sqlalchemy import Column, Integer, String, DateTime, func
+from sqlalchemy import Column, DateTime, Integer, String, func
+
 from src.data.clients.postgres_client import base
+
 
 class User(base):
     __tablename__ = "users"
