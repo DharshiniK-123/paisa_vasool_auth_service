@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import logging
+from typing import Any, cast
 
 from fastapi import APIRouter, Depends, HTTPException, Request, Response
 from sqlalchemy.exc import IntegrityError
@@ -29,40 +30,6 @@ from src.schemas.user_schema import AdminCreateUser, CreateUser, UserLogin, User
 logger = logging.getLogger(__name__)
 
 router = APIRouter()
-
-
-@router.post("/seed-admin")
-async def seed_admin(db: AsyncSession = Depends(get_db)) -> dict[str, str]:
-    """Seed admin data."""
-    try:
-        existing = await get_user("admin@example.com", db)
-        if existing:
-            raise HTTPException(status_code=400, detail="Admin already seeded")
-
-        from src.data.models.postgres.user import User
-
-        admin = User(
-            first_name="Super",
-            last_name="Admin",
-            phone_no="9080014226",
-            email="admin@gmail.com",
-            password=get_password_hashed(settings.ADMIN_SEED_PASSWORD),
-            role="admin",
-            is_active="active",
-        )
-
-        db.add(admin)
-        await db.commit()
-
-        return {"message": "Admin seeded successfully", "email": "admin@example.com"}
-
-    except HTTPException:
-        raise
-
-    except Exception as e:
-        await db.rollback()
-        logger.exception("Failed to seed admin")
-        raise HTTPException(status_code=500, detail="Failed to seed admin.") from e
 
 
 @router.post("/register")
@@ -146,7 +113,7 @@ async def login_user(
 
 
 @router.get("/auth/me")
-async def me(user: dict = Depends(get_current_user)) -> dict[str, str | int]:
+async def me(user: dict[str, Any] = Depends(get_current_user)) -> dict[str, str | int]:
     """Return current authenticated user data."""
     return {
         "user_id": user["id"],
@@ -171,6 +138,9 @@ async def logout(
             raise HTTPException(status_code=403, detail="Invalid session. Please log in again.")
 
         jti = payload.get("jti")
+        if not isinstance(jti, str):
+            raise HTTPException(status_code=403, detail="Invalid token identifier.")
+
         await revoke_refresh_token(jti, db)
         response.delete_cookie("refresh_token")
 
@@ -202,6 +172,8 @@ async def refresh_token(
             raise HTTPException(status_code=403, detail="Invalid session. Please log in again.")
 
         jti = payload.get("jti")
+        if not isinstance(jti, str):
+            raise HTTPException(status_code=403, detail="Invalid token identifier.")
 
         if await is_revoked(jti=jti, db=db):
             raise HTTPException(
@@ -230,12 +202,12 @@ async def refresh_token(
 
 @router.get("/admin/users", response_model=list[UserResponse])
 async def list_users(
-    admin: dict = Depends(get_current_admin),
+    admin: dict[str, Any] = Depends(get_current_admin),
     db: AsyncSession = Depends(get_db),
 ) -> list[UserResponse]:
     """List all non-admin users."""
     try:
-        return await get_all_users(db)
+        return cast(list[UserResponse], await get_all_users(db))
 
     except Exception as e:
         logger.exception("Failed to fetch users")
@@ -245,7 +217,7 @@ async def list_users(
 @router.post("/admin/users", response_model=UserResponse)
 async def admin_create_user(
     user_data: AdminCreateUser,
-    admin: dict = Depends(get_current_admin),
+    admin: dict[str, Any] = Depends(get_current_admin),
     db: AsyncSession = Depends(get_db),
 ) -> UserResponse:
     """Admin endpoint to create a new user."""
@@ -258,10 +230,12 @@ async def admin_create_user(
         if existing_phone:
             raise HTTPException(status_code=400, detail="Phone number already exists")
 
-        await create_user(db=db, user_data=user_data, role="finance_associate")
+        await create_user(db=db, user_data=cast(CreateUser, user_data), role="finance_associate")
 
         created = await get_user(user_data.email, db)
-        return created
+        if not created:
+            raise HTTPException(status_code=500, detail="Failed to retrieve created user.")
+        return cast(UserResponse, created)
 
     except HTTPException:
         raise
@@ -280,7 +254,7 @@ async def admin_create_user(
 @router.patch("/admin/users/{user_id}/toggle-status", response_model=UserResponse)
 async def toggle_user_status_route(
     user_id: int,
-    admin: dict = Depends(get_current_admin),
+    admin: dict[str, Any] = Depends(get_current_admin),
     db: AsyncSession = Depends(get_db),
 ) -> UserResponse:
     """Toggle user active/inactive status."""
@@ -289,7 +263,7 @@ async def toggle_user_status_route(
 
         if not user:
             raise HTTPException(status_code=404, detail="User not found")
-        return user
+        return cast(UserResponse, user)
 
     except HTTPException:
         raise
@@ -297,3 +271,4 @@ async def toggle_user_status_route(
     except Exception as e:
         logger.exception("Failed to toggle user status", extra={"user_id": user_id})
         raise HTTPException(status_code=500, detail="Failed to update user status.") from e
+

@@ -15,10 +15,11 @@ from src.data.repositories.generic_repository import (
     insert_instance,
     update_instance_by_id,
 )
+from src.schemas.user_schema import CreateUser
 from src.utils.uuid import to_uuid
 
 
-async def create_user(db: AsyncSession, user_data, role: str = "finance_associate") -> None:
+async def create_user(db: AsyncSession, user_data: CreateUser, role: str = "finance_associate") -> None:
     hashed_password = get_password_hashed(user_data.password)
     user_dict = user_data.model_dump()
     user_dict["password"] = hashed_password
@@ -81,3 +82,4 @@ async def toggle_user_status(user_id: int, db: AsyncSession) -> User | None:
     await update_instance_by_id(id=user_id, model=User, db=db, is_active=new_status)
     user.is_active = new_status
     return user
+
